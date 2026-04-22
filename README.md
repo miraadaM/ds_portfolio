@@ -1,1 +1,6 @@
-# df_portfolio
+# About the website
+This is my data science portfolio
+
+# Education
+## Simmons University
+B.S.: Computer Science, Math | GPA: 3.99/4.00
