@@ -1,0 +1,91 @@
+---
+title: "Exploring Data Quality with visdat: Visual Diagnostics for Real-World Datasets"
+author: "Mirada Makhmutova"
+date: '02/07/2026'
+output:
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float: yes
+    code_download: yes
+  pdf_document:
+    toc: yes
+---
+# Introduction
+In real-world data science, understanding the structure and quality of a dataset is a crucial first step before any cleaning, modeling, or analysis. Datasets often contain missing values, inconsistent data types, or unexpected patterns that can lead to incorrect conclusions if not identified early.
+In this blog post, I explore the R package visdat, which provides visual tools for diagnosing common data quality issues. Using a real-world dataset, I demonstrate how visdat can help data scientists quickly understand their data through intuitive visualizations.
+
+## Package Overview: visdat
+The visdat package is designed to help data scientists visually explore the structure and quality of datasets. Instead of relying solely on summary tables, visdat uses visual representations to highlight data types, missing values, and potential inconsistencies.
+These tools are especially useful at the beginning of a data analysis workflow, allowing analysts to identify potential issues before investing time in data cleaning or modeling.
+
+```{r, warning = FALSE, message = FALSE}
+# Load any R Packages you may need using the library function
+library(visdat)
+library(tidyverse)
+library(nycflights13)
+
+```
+## Dataset Description
+The dataset used in this analysis is the flights dataset from the nycflights13 R package. This dataset contains information on all flights departing from New York City airports (JFK, LGA, and EWR) in 2013, including flight delays, airlines, destinations, and weather-related variables.
+The dataset includes:
+336,776 observations
+19 variables
+A mix of numeric, character, and date-time data
+The nycflights13 package provides well-curated datasets commonly used for teaching and exploratory data analysis.
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+# Load any datasets you may need 
+
+
+```
+# Exploring visdat Functions
+To ensure clear and interpretable visualizations, I used a random subset of 5,000 observations from the dataset, since the full dataset exceeds the recommended size for visdat visual diagnostics.I called the new sample: 'flights_sample'.
+
+### vis_dat(typical_data)
+vis_dat() helps explore the data class structure and missingness.
+This visualization makes it easy to quickly understand the composition of the dataset. For example, we can immediately see which variables are numeric, which are categorical, and which contain date-time values. This information is useful when deciding how variables should be handled in later analysis steps.
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+#create a smaller sample so it would be readable
+set.seed(123)
+flights_sample <- flights %>%
+dplyr::slice_sample(n = 5000)
+```
+
+```{r, warning = FALSE, message = FALSE}
+vis_dat(flights_sample)
+```
+
+### vis_expect()
+The `vis_expect()` function is used to evaluate whether values in a dataset meet predefined expectations or logical rules. It allows data scientists to assess whether the data behaves in a way that makes sense given the real-world context.
+
+This code chunk is designed to verify that every entry in the origin column matches one of the three New York City airport codes: JFK, LGA, or EWR. Essentially, the code is technically correct, but the visualization tool is failing to execute the comparison properly, resulting in a purple block that incorrectly suggests your data is invalid.
+
+```{r, warning = FALSE, message = FALSE}
+flights_sample %>% mutate(origin = as.character(origin)) %>% select(origin) %>% vis_expect(~ .x %in% c("JFK", "LGA", "EWR"))
+```
+
+
+### vis_guess()
+Vis_guess() function compares the actual data types of variables with what visdat guesses the types should be based on the values.
+```{r, warning = FALSE, message = FALSE}
+vis_guess(flights_sample)
+```
+In the visualization provided for the flights_sample data, we can see a diverse mix of data types across the various columns of the NYC flights dataset. The predominant teal sections represent integer values for variables like year, month, and day, while the large salmon-colored blocks identify character strings for variables like carrier, tail number, and origin. Interestingly, the arr_delay column shows a significant amount of "noise" with purple lines, suggesting that while the column is largely numeric, many specific observations are being guessed as a different subtype or contain values that deviate from a simple integer. The solid green bar on the far right for time_hour confirms that the package successfully identifies date-time objects
+
+This function is useful for identifying variables that may be incorrectly typed. For example, a variable stored as a character may actually represent numeric data. Detecting these issues early can prevent errors during modeling or statistical analysis.
+
+# Reflection
+Before working on this project, I thought there were only one or two basic ways to visualize data, so I was surprised by how many different approaches actually exist. I really enjoyed exploring the variety of tools available for analyzing and visualizing data, especially because they offer different perspectives on the same dataset. I found these visual methods very useful for understanding the structure of the data without having to manually inspect large tables.
+
+At the same time, some concepts were challenging for me to understand at first because several functions looked very similar. The most difficult part was carefully examining how each function works and identifying the specific differences between them. However, this process helped me think more deeply about what each visualization is actually showing. This project also helped me learn the basics of R Markdown, which made organizing and presenting my analysis much easier.
+
+Overall, this project helped me better understand the importance of visual data diagnostics. Now, when I encounter an unfamiliar dataset, I have a clearer idea of how to begin exploring it. I also feel more confident in my ability to learn and experiment with new R packages independently.
+
+# References
+-**visdat package vignette:**
+  [using visdat](https://cran.r-project.org/web/packages/visdat/vignettes/using_visdat.html)
+  
+-**nycflights13 package documentation:**
+  [nycflights13](https://nycflights13.tidyverse.org)

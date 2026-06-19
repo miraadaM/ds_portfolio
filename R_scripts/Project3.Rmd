@@ -1,0 +1,169 @@
+---
+title: "Wrangling the 2026 Winter Olympics Data"
+author: "Mirada Makhmutova"
+date: "03/21/2026"
+output: 
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_download: true
+---
+
+# Introduction part!
+The Winter Olympics bring together various sports, venues, and events across a packed schedule. While the raw schedule data is informative, it is not immediately structured for answering deeper questions.
+
+In this tutorial, we will walk through how to wrangle and transform a real-world dataset to uncover insights about:
+
+* Which sports dominate the Olympic schedule?
+* Which venues host the most events?
+* How long different events typically last?
+
+# Dataset
+We will use the 2026 Winter Olympics schedule dataset, provided by the TidyTuesday project (and their suggested questoins as well). You should install tidytuesdayR package and load following R Packages below:
+[Source](https://github.com/rfordatascience/tidytuesday/blob/main/data/2026/2026-02-10/readme.md#schedulecsv)
+
+```{r, warning = FALSE, message = FALSE}
+# Load any R Packages you may need
+library(tidyverse)
+## install.packages("tidytuesdayR")
+schedule <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-10/schedule.csv')
+
+```
+
+This dataset includes information about event timing, disciplines, venues, and whether events are training sessions or medal competitions
+
+# **Let's start now!**
+## **Step 1:** clean data to include only real competition events
+
+```{r, warning = FALSE, message = FALSE}
+events <- schedule %>%
+  filter(is_training == FALSE)
+```
+
+# **Which sports dominate the Olympic schedule?**
+To examine that we will look to which sports have the most events. Let's count the number of events per sport:
+
+```{r, warning = FALSE, message = FALSE}
+discipline_counts <- events %>%
+  count(discipline_name, sort = TRUE)
+
+discipline_counts
+```
+
+This plot shows that sports such as Curling, Freestyle Skiing and Snowboard have the highest number of scheduled events.
+
+```{r, warning = FALSE, message = FALSE}
+ggplot(discipline_counts, aes(x = reorder(discipline_name, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Number of Events by Discipline",
+    x = "Discipline",
+    y = "Number of Events"
+  )
+```
+
+# **Which Venues Host the Most Events?**
+To determine which venues host the most events, we count occurrences of venue_name; however, since the data contains missing values, we first apply mode imputation by replacing them with the most frequent venue to ensure all events are included in the analysis.
+
+```{r, warning = FALSE, message = FALSE}
+#Finding mode (most common value for venue_name):
+mode_venue <- events %>%
+  filter(!is.na(venue_name)) %>%
+  count(venue_name, sort = TRUE) %>%
+  slice(1) %>%
+  pull(venue_name)
+mode_venue
+
+#Impute missing values with mode
+events_imputed <- events %>%
+  mutate(
+    venue_name = if_else(is.na(venue_name), mode_venue, venue_name)
+  )
+# Count venues
+venue_counts <- events_imputed %>%
+  count(venue_name, sort = TRUE) 
+
+venue_counts
+```
+
+Some venues host significantly more events than others, likely due to multi-use facilities or sports with many sub-events. Let's visualise it:
+
+```{r, warning = FALSE, message = FALSE}
+ggplot(venue_counts, aes(x = reorder(venue_name, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Number of Events by Venue",
+    x = "Venue",
+    y = "Number of Events"
+  )
+```
+
+# **How long different events typically last**
+
+To calculate duration we will use start and end times that dataset provides and then compute it using mutate()
+
+```{r, warning = FALSE, message = FALSE}
+events <- events %>%
+  mutate(duration_minutes = as.numeric(
+    difftime(end_datetime_local, start_datetime_local, units = "mins")
+  ))
+```
+
+## **More advanced**
+Now let's:
+
+* Calculate overall average duration:
+* Summarize the average duration of events for each discipline and add new column that shows if its event's average duration is higher than average duration of all events:
+
+```{r, warning = FALSE, message = FALSE}
+overall_avg <- mean(events$duration_minutes, na.rm = TRUE)
+
+duration_summary <- events %>%
+  group_by(discipline_name) %>%
+  summarize(
+    avg_duration = mean(duration_minutes, na.rm = TRUE)) %>%
+  mutate(
+    above_average = avg_duration > overall_avg
+  )
+duration_summary
+
+```
+
+**Final step!** Visualise it:
+This bar chart shows the average duration of events for each Olympic discipline. The disciplines are ordered from longest to shortest average duration, making comparisons easier. The dashed horizontal line represents the overall average event duration across all disciplines. Colors indicate whether a discipline’s average duration is above (TRUE) or below (FALSE) the overall average.
+
+```{r, warning = FALSE, message = FALSE}
+ggplot(duration_summary, aes(
+  x = reorder(discipline_name, avg_duration),
+  y = avg_duration,
+  fill = above_average
+)) +
+  geom_col() +
+  coord_flip() +
+  geom_hline(yintercept = overall_avg, linetype = "dashed") +
+  labs(
+    title = "Average Event Duration by Discipline",
+    subtitle = "Dashed line represents overall average duration",
+    x = "Discipline",
+    y = "Average Duration (minutes)",
+    fill = "Above Overall Average"
+  )
+```
+
+From the visualization, we observe that disciplines such as Curling, Ice Hockey, and Figure Skating have significantly longer event durations than the overall average. In contrast, most disciplines fall below the average, with events like Short Track Speed Skating and Ski Mountaineering.
+
+# **References**
+
+- **TidyTuesday (2026). 2026 Winter Olympics Schedule Dataset. Retrieved from:**
+  [2026 Winter Olympics Schedule Dataset](https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2026/2026-02-10/schedule.csv)
+- **ggplot2 Documentation - Reference Lines** [Reference Line](https://ggplot2.tidyverse.org/reference/geom_abline.html)
+- **ggplot2 Documentation – coord_flip** [coord_flip](https://ggplot2.tidyverse.org/reference/coord_flip.html)
+- **difftime: Time Intervals / Differences** [source](https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/difftime)
+
+
+
+
+

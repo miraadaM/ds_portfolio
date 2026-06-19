@@ -1,10 +1,47 @@
-# About the website
-This is my data science portfolio
+# Mirada Makhmutova
 
-# Education
-## Simmons University
-B.S.: Computer Science, Math | GPA: 3.99/4.00
+## Data Science Portfolio
 
-[Project 1](https://miraadaM.github.io/df_portfolio/FinalProject-copy_copy.html)
+Hi, I am Mirada Makhmutova. I am studying **Computer Science and Math** at
+**Simmons University**, where I currently have a **3.99 / 4.00 GPA**.
 
-[portfolio](https://miraadaM.github.io/df_portfolio/2026/04/22/Predicting_Pit_Stops:_A_Data-Driven_Look_at_Formula_1_Strategy)
+I am interested in data science, statistical modeling, data visualization, and
+using R to turn messy data into clear, practical conclusions.
+
+## About Me
+
+My projects focus on asking a real analytical question, preparing the data,
+building visual evidence, and explaining the results in a way that is easy to
+follow. I especially enjoy projects where statistics, programming, and real-world
+decision-making come together.
+
+## Projects
+
+| Project | Description | Report | Source |
+| --- | --- | --- | --- |
+| **Predicting Pit Stops: A Data-Driven Look at Formula 1 Strategy** | A classification project predicting whether a Formula 1 driver will pit on the next lap using tire life, race progress, degradation, lap-time changes, and position changes. | [View report](FinalProject-copy%20copy.html) | [R Markdown](R_scripts/FinalProject.Rmd) |
+| **Wrangling the 2026 Winter Olympics Data** | A data wrangling and visualization project using Olympic schedule data to compare sports, venues, and event duration. | [View report](Project3.html) | [R Markdown](R_scripts/Project3.Rmd) |
+| **Exploring Data Quality with visdat** | A visual data diagnostics project using the `visdat` package and `nycflights13` data to inspect structure, missingness, and data types. | [View report](Project1.html) | [R Markdown](R_scripts/Project1.Rmd) |
+
+## Skills
+
+- R and R Markdown
+- Data cleaning and transformation with `tidyverse`
+- Data visualization with `ggplot2`
+- Exploratory data analysis
+- Logistic regression and decision trees
+- Model evaluation with confusion matrices, ROC curves, and AUC
+- Clear written communication of methods, results, and limitations
+
+## Education
+
+**Simmons University**
+
+B.S. in Computer Science and Math
+
+GPA: **3.99 / 4.00**
+
+## Contact
+
+- GitHub: [miraadaM](https://github.com/miraadaM)
+- Portfolio repository: [df_portfolio](https://github.com/miraadaM/df_portfolio)

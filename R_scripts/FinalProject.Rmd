@@ -1,0 +1,266 @@
+---
+title: 'Predicting Pit Stops: A Data-Driven Look at Formula 1 Strategy'
+author: "Mirada Makhmutova"
+date: "04/17/2026"
+output:
+  html_document:
+    theme: flatly
+    toc: true
+    toc_float: true
+    code_download: true
+  pdf_document:
+    toc: true
+---
+<style type="text/css">
+h1.title {
+  text-align: center;
+}
+h4.author, h4.date {
+  text-align: center;
+}
+</style>
+<img src="f1.png" width="600" style="display:block; margin:auto;">
+
+# **Ever wondered what factors influence whether a Formula 1 driver will pit on the next lap? **
+
+In Formula 1, races are not only won on the track - but also in the pit lane. One of the most critical strategic decisions teams make is determining the exact moment to bring a driver in for a pit stop. Being too early or too late can lead to losing several positions, and being exactly right could change the result of the entire race.
+
+But what does affect pit-stop decisions then? Do they happen due to tire degradation and lap performance, or there is some specific pattern to these events which can be revealed?
+
+This research project focuses on predicting the time of next lap pit stop of a driver based on lap by lap data for a single race. To put it simply, my goal was to find out the factors affecting decision making about the pit stop.
+
+The dataset used in this analysis is the publicly available F1 Strategy | Pit Stop Prediction dataset from Kaggle library (https://www.kaggle.com/datasets/aadigupta1601/f1-strategy-dataset-pit-stop-prediction/data), which provides detailed lap-level data across multiple races (different years). Each observation represents a single lap for a specific driver and includes variables such as lap time, tire life, position changes, and engineered features like cumulative degradation and lap time deltas. The target variable, PitNextLap, indicates whether a driver will enter the pit on the following lap, making this a classification problem.
+
+It is important to note that there are practical aspects that cannot be fully accounted for in the model such as the race team strategy, weather, or competitor’s behavior that may affect its predictive capabilities.
+
+Despite these limitations, this analysis aims to uncover patterns in pit stop strategy and examining whether the machine learning algorithms are able to predict one of the most important decision-making processes in Formula One.
+ 
+**Install f1_stragedy_dataset_v4.csv dataset and packages below.**
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(pROC)
+f1_dataset <- read_csv("f1_strategy_dataset_v4.csv")
+```
+
+## Before beginning, let’s clean our dataset:
+We need to convert target variable to factor types for better modeling. Then, we examine the distribution of our target variable - PitNextLap - by using prob.table(). Additionally, while I would usually check the dataset for missing values, the Kaggle resource states that there are no missing values in this dataset.
+
+```{r, warning = FALSE, message = FALSE}
+# Convert categorical variables and target variable to factors
+f1_dataset <- f1_dataset %>%
+  mutate(
+    PitNextLap = factor(PitNextLap, levels = c(0, 1), labels = c("NoPit", "Pit")),
+    PitStop = as.factor(PitStop),
+    Driver = as.factor(Driver),
+    Race = as.factor(Race)
+  )
+# checking class balance
+prop.table(table(f1_dataset$PitNextLap))
+```
+
+# **Now we are ready to start!**
+## Before building models, it’s important to explore patterns in the data visually. 
+I suggest we utilize a violin plot combined with a logarithmic scale to better visualize the density of pit decisions, as this format prevents extreme outliers from masking the typical tire degradation patterns seen during a race:
+
+```{r, warning = FALSE, message = FALSE}
+ggplot(f1_dataset, aes(x = factor(PitNextLap), y = Cumulative_Degradation, fill = factor(PitNextLap))) +
+  geom_violin(alpha = 0.3, trim = TRUE) + 
+  scale_y_log10() + 
+  scale_fill_manual(values = c("NoPit" = "skyblue", "Pit" = "red")) +
+  labs(
+    title = "Distribution of Tire Degradation",
+    subtitle = "Logarithmic scale used to manage extreme outliers",
+    x = "Pit Next Lap (0 = No, 1 = Yes)",
+    y = "Cumulative Degradation (Log Scale)"
+  ) +
+  theme_minimal()
+```
+
+On the whole, both these distributions are quite similar, but there is a slight shift toward higher degradation values when PitNextLap = 1, meaning drivers who are about to pit tend to have more worn tires.
+However, there is still a large overlap between the two groups. This suggests that while tire degradation plays a role in pit stop decisions, it is not the only factor. Drivers do not pit solely based on tire wear - race conditions and strategy also influence the decision.
+
+**Now, let's examine how lap time changes differ depending on whether a driver is about to pit.**
+
+```{r, warning = FALSE, message = FALSE}
+ggplot(f1_dataset, aes(x = LapTime_Delta, fill = factor(PitNextLap))) +
+  geom_density(alpha = 0.5) +
+  coord_cartesian(xlim = c(-5, 5)) + # to zoom
+  scale_fill_manual(values = c("NoPit" = "skyblue", "Pit" = "red"), 
+                    labels = c("Stay Out", "Pit")) +
+  labs(
+    title = "Lap Time Changes",
+    subtitle = "Focusing on the -5 to +5 second range to ignore extreme outliers",
+    x = "Lap Time Delta (Seconds)",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+From the plot, both groups (pit vs stay out) show similar overall shapes, but there is a slight tendency for drivers who are about to pit to have more positive lap time changes, indicating worsening performance.
+However, there is still a large overlap between the two distributions. This suggests that while increasing lap times may contribute to pit decisions, it is not a strong standalone predictor.
+
+## **Modelling**
+
+The goal of modelling is to predict whether a driver will pit on the next lap (PitNextLap) based on race conditions and performance indicators (0=no, 1=yes).
+
+**Let's split our data into training and testing sets**
+
+```{r, warning = FALSE, message = FALSE}
+set.seed(352)
+
+train_index <- createDataPartition(f1_dataset$PitNextLap, p = 0.7, list = FALSE)
+
+train <- f1_dataset[train_index, ]
+test  <- f1_dataset[-train_index, ]
+
+```
+
+The dataset was split into 70% training and 30% testing data, which is a common choice that balances model learning and evaluation. Since the target variable is moderately imbalanced (approximately 75% no pit vs 25% pit), a stratified sampling approach was used to preserve class proportions in both subsets. This ensures that model performance is evaluated on data that reflects the original distribution.
+
+**Now, we will evaluate model and see predictions using code below:**
+
+```{r, warning = FALSE, message = FALSE}
+model_logit <- glm(
+  PitNextLap ~ TyreLife + Cumulative_Degradation + RaceProgress + LapTime_Delta + Position_Change,
+  data = train,
+  family = "binomial"
+)
+summary(model_logit)
+#predict probabilities
+prob_logit <- predict(model_logit, test, type = "response")
+
+#convert probabilities to 0/1 predictions
+pred_logit <- factor(
+  ifelse(prob_logit > 0.5, "Pit", "NoPit"),
+  levels = levels(test$PitNextLap)
+)
+
+#building confusion matrix
+confusionMatrix(pred_logit, test$PitNextLap)
+
+# finding AUC
+roc_logit <- roc(test$PitNextLap, prob_logit)
+auc(roc_logit)
+plot(roc_logit, col = "blue", main = "ROC Curve for Logistic Model")
+```
+
+The logistic regression model achieved an overall accuracy of approximately 75%, which is close to the baseline accuracy of always predicting “no pit.” While the model performs very well in identifying laps where no pit stop occurs (sensitivity, meaning how well we predict 'Stay Out' laps ≈ 96%), it struggles to correctly predict actual pit stops, with a specificity (measures ability to correctly call a 'Pit' stop) of only about 13%. The AUC with value of 0.6939 means that the model is somewhat capable of distinguishing between pit and non-pit situations, but not with high reliability.
+
+This indicates that the model is biased toward the majority class and tends to predict that drivers will stay out, even in situations where a pit stop occurs. As a result, although the accuracy appears high, the model has limited practical usefulness for predicting pit stop decisions, which are relatively rare but strategically important events.
+
+**Now, we will consider doing same analyse but using decision tree!**
+The decision tree provides a visual representation of how pit stop decisions are made based on race conditions.
+
+```{r, warning = FALSE, message = FALSE}
+initial_tree <- rpart(
+  PitNextLap ~ TyreLife + Cumulative_Degradation + RaceProgress + LapTime_Delta + Position_Change,
+  data = train,
+  method = "class"
+)
+
+rpart.plot(
+  initial_tree,
+  type = 5,
+  extra = 104, #probability per class of observations in the node
+  fallen.leaves = TRUE, #put leaves lined up at bottom
+  box.palette = "auto" #changes color palette
+)
+```
+
+**The initial decision tree model produced a highly complex structure with many splits and conditions. To solve this, I applied hyperparameter tuning to get a simpler model.**
+
+``` {r, warning = FALSE, message = FALSE}
+cv_control <- trainControl(method='cv', number=5, classProbs=T, summaryFunction=twoClassSummary, savePredictions='final')
+
+cv_model <- train(PitNextLap ~ TyreLife + Cumulative_Degradation + RaceProgress + LapTime_Delta + Position_Change, data=train, method='rpart', trControl=cv_control, metric='ROC', tuneLength=20)
+
+#plot(cv_model)
+#rpart.plot(cv_model$finalModel, type = 5, extra = 104, box.palette = "auto")
+
+model_depth3 <- train(
+  PitNextLap ~ TyreLife + Cumulative_Degradation + RaceProgress + LapTime_Delta + Position_Change,
+  data = train,
+  method = "rpart",
+  trControl = cv_control,
+  metric = "ROC",
+  tuneLength = 20,
+  control = rpart.control(maxdepth = 3)
+)
+model_depth4 <- train(
+  PitNextLap ~ TyreLife + Cumulative_Degradation + RaceProgress + LapTime_Delta + Position_Change,
+  data = train,
+  method = "rpart",
+  trControl = cv_control,
+  metric = "ROC",
+  tuneLength = 20,
+  control = rpart.control(maxdepth = 4)
+)
+model_depth5 <- train(
+  PitNextLap ~ TyreLife + Cumulative_Degradation + RaceProgress + LapTime_Delta + Position_Change,
+  data = train,
+  method = "rpart",
+  trControl = cv_control,
+  metric = "ROC",
+  tuneLength = 20,
+  control = rpart.control(maxdepth = 5)
+)
+
+best_roc <- c(depth3= max(model_depth3$results$ROC), depth4= max(model_depth4$results$ROC), depth5 = max(model_depth5$results$ROC))
+
+final_model <- model_depth3
+rpart.plot(final_model$finalModel,
+           type = 5,
+           extra = 104,
+           box.palette = "auto")
+
+pred_prob <- predict(final_model, test, type = "prob")[, "Pit"]
+roc_tree <- roc(test$PitNextLap, pred_prob, levels = c("NoPit", "Pit"))
+auc(roc_tree)
+plot(roc_tree, col = "blue", main = "ROC Curve for Decision Tree")
+```
+
+Using a large sample of laps, the algorithm determined that the most influential variable is Tyre Life, specifically highlighting 12 laps as the threshold where a pit stop becomes much more likely.
+
+However, the tree shows that teams do not just look at tire life; they also consider how much of the race has passed and how many positions the driver has gained or lost. Despite providing these intuitive decision rules, the model’s AUC score of 0.685 indicates that it performs only slightly better than random guessing in distinguishing between pit and no-pit situations. This suggests that while the tree is useful for understanding general patterns, it does not capture the full complexity of pit stop decisions.
+
+## **Comparison**
+
+The key difference lies in how the models handle complexity. Logistic regression captures overall trends in the data more effectively, while the decision tree, even after simplification, struggles to generalize and capture consistent patterns across different race situations.
+
+In summary, the logistic regression model was able to perform better than the decision tree model in terms of prediction accuracy, but the tree is still more useful for interpretation purposes.
+
+# **Conclusion & Discussion**
+The analysis showed that several key factors influence pit stop decisions, most notably tire life, race progress, and position changes. Both models confirmed that tire wear plays a central role, supporting the intuition that degrading tires increase the likelihood of a pit stop.
+
+However, some limitations were also noted during modeling analysis. Since the data was a little imbalanced, meaning that the number of occurrences "No Pits" exceeds those with pit stops, models tend to give preference to “No Pit” label, increasing their accuracy but decreasing the probability of correct prediction of pit events.
+
+Between the two approaches, logistic regression demonstrated stronger predictive performance, achieving a higher AUC and better distinguishing between pit and no-pit scenarios. In contrast, the decision tree offered clearer interpretability by breaking decisions into simple rules, but at the cost of lower predictive accuracy.
+
+These findings highlight an important trade-off in data science: models that are easier to interpret are not always the most accurate. In the context of Formula 1, this reflects the reality that pit stop decisions are influenced by complex and dynamic factors (weather, driver's emotional state) that are difficult to fully capture with simple rules.
+
+Overall, this project illustrates that although data can reveal useful insights into strategies of race, the prediction of pit stops is a difficult question that requires the analysis of both measurable elements and strategic considerations.
+
+For future work, there is scope for including other contextual features, adopting other analytical methods, or class balancing through resampling techniques.
+
+
+# **References**
+
+- **Kaggle Datasets (2026). F1 Strategy Dataset | Pit Stop Prediction. Installed from:**
+  [dataset link](https://www.kaggle.com/datasets/aadigupta1601/f1-strategy-dataset-pit-stop-prediction/data)
+  
+- **R Markdown Tips: Code, Images, Comments, Tables, and more. (n.d.).** [link](https://www.appsilon.com/post/r-markdown-tips)
+
+- **Smoothed density estimates - geom_density. (n.d.)** (https://ggplot2.tidyverse.org/reference/geom_density.html)
+
+- **Zoom-in feature:** [GitHub source](https://github.com/wilkelab/ggridges/issues/60)
+
+
+
+
+
