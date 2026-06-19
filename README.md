@@ -2,8 +2,8 @@
 
 ## Mirada Makhmutova
 
-Hi, I am Mirada Makhmutova. I am studying **Computer Science, Data Science, and Math** at
-**Simmons University** in Boston, MA, where I currently have a **3.99 / 4.00 GPA**.
+Hi, I am Mirada! I am studying **Computer Science, Data Science, and Math** at
+**Simmons University** in Boston, MA.
 
 I am interested in data science, statistical modeling, data visualization, and
 using R to turn messy data into clear, practical conclusions.
