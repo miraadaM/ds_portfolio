@@ -17,7 +17,7 @@ decision-making come together.
 
 ## Projects
 
-| Project | Description | Report | Source |
+| Project | Description | Report |
 | --- | --- | --- | --- |
 | **Predicting Pit Stops: A Data-Driven Look at Formula 1 Strategy** | A classification project predicting whether a Formula 1 driver will pit on the next lap using tire life, race progress, degradation, lap-time changes, and position changes. | [View report](FinalProject-copy%20copy.html) | 
 | **Wrangling the 2026 Winter Olympics Data** | A data wrangling and visualization project using Olympic schedule data to compare sports, venues, and event duration. | [View report](Project3.html) | 
